@@ -36,7 +36,7 @@ public class GMailTest {
 
     @Test
     public void testUndoWithMessagesDeletion() {
-        LOG.info("inside test");
+        LOG.info("TEST STARTED");
         Document xml = myParser.parseXML("./src/main/resources/LoginAndPassword.xml");
         AuthorizationPage authorizationPage = new AuthorizationPage(driver);
         InboxPage inboxPage = new InboxPage(driver);
@@ -45,7 +45,7 @@ public class GMailTest {
                 xml.getElementsByTagName("password").item(0).getTextContent());
         inboxPage.selectAndDeleteMessages(3);
         Assert.assertTrue(inboxPage.isUndoCompleted());
-        LOG.info("test successfully passed");
+        LOG.info("TEST SUCCESSFULLY PASSED");
     }
 
     @AfterClass

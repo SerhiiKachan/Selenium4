@@ -1,63 +1,64 @@
 package com.epam.lab.page_object;
 
-import com.epam.lab.parser.MyParser;
+import com.epam.lab.specific_element.Button;
+import com.epam.lab.specific_element.CheckBox;
 import org.apache.log4j.Logger;
 import org.openqa.selenium.*;
-import org.openqa.selenium.support.FindAll;
 import org.openqa.selenium.support.FindBy;
 import org.openqa.selenium.support.PageFactory;
-import org.openqa.selenium.support.ui.ExpectedConditions;
-import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Properties;
 
 public class InboxPage {
 
     private WebDriver driver;
-    private WebDriverWait wait;
     private List<String> identifiers;
-    private Logger LOG = Logger.getLogger(InboxPage.class);
+    private final Logger LOG = Logger.getLogger(InboxPage.class);
 
-    @FindAll({@FindBy(xpath = "//tr[1]/td/div[contains(@class, 'oZ-jc T-Jo J-J5-Ji ')]"),
-            @FindBy(xpath = "//tr[2]/td/div[contains(@class, 'oZ-jc T-Jo J-J5-Ji ')]"),
-            @FindBy(xpath = "//tr[3]/td/div[contains(@class, 'oZ-jc T-Jo J-J5-Ji ')]")})
-    private List<WebElement> messages;
+    @FindBy(css = "table.F.cf.zt tbody div[role='checkbox']")
+    private List<CheckBox> messages;
 
     @FindBy(css = "div.T-I.J-J5-Ji.nX.T-I-ax7.T-I-Js-Gs.mA")
-    private WebElement deleteButton;
+    private Button deleteButton;
 
     @FindBy(id = "link_undo")
-    private WebElement undoButton;
+    private Button undoButton;
 
     public InboxPage(WebDriver webDriver) {
-        Properties driverProps = new MyParser().parsePropertiesFile("./src/main/properties/driver.properties");
         driver = webDriver;
-        wait = new WebDriverWait(driver, Integer.parseInt(driverProps.getProperty("explicit_wait")));
         PageFactory.initElements(new CustomFieldDecorator(driver), this);
         identifiers = new ArrayList<>();
     }
 
-    private void selectMessage(WebElement message, int index) {
+    private void selectMessage(CheckBox message, int index) {
         try {
-            message.click();
+            if (!message.isChecked())
+                message.click();
         } catch (StaleElementReferenceException e) {
-            message = driver.findElement(By.xpath(("//tr[" + String.valueOf(index) + "]/td/div[contains(@class, 'oZ-jc T-Jo J-J5-Ji ')]")));
-            message.click();
+            message = messages.get(index - 1);
+            if (!message.isChecked())
+                message.click();
         }
         identifiers.add(message.getAttribute("id"));
+        LOG.info("Message selected");
     }
 
     private void deleteMessages() {
-        wait.until(ExpectedConditions.elementToBeClickable((deleteButton))).click();
+        LOG.info("Deleting messages...");
+        deleteButton.click();
+        LOG.info("Completed");
     }
 
     private void undo() {
-        wait.until(ExpectedConditions.elementToBeClickable((undoButton))).click();
+        LOG.info("Undo deleting...");
+        undoButton.click();
+        LOG.info("Completed");
     }
 
     public void selectAndDeleteMessages(int quantity) {
+        LOG.info("Inside inbox page");
+        LOG.info("Selecting messages to delete...");
         int i = 1;
         if (messages.size() >= quantity) {
             while (i <= quantity) {
@@ -72,14 +73,22 @@ public class InboxPage {
     }
 
     public boolean isUndoCompleted() {
+        LOG.info("Checking undo operation...");
         try {
-            for (int i = 0; i < messages.size(); i++) {
+            Thread.sleep(1000);
+            int i = 0;
+            while (i < 3) {
                 if (!messages.get(i).getAttribute("id").equals(identifiers.get(i)))
                     throw new NoSuchElementException("Can't find element with id=" + identifiers.get(i) + ". Element has been deleted.");
+                i++;
             }
+            LOG.info("Completed");
             return true;
         } catch (NoSuchElementException e) {
             LOG.error(e.getMessage());
+            return false;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
             return false;
         }
     }

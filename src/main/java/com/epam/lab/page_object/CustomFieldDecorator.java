@@ -1,55 +1,74 @@
 package com.epam.lab.page_object;
 
+import com.epam.lab.specific_element.IElement;
+import com.epam.lab.specific_element.LocatingCustomElementListHandler;
+import com.epam.lab.specific_element.WrapperFactory;
 import org.openqa.selenium.SearchContext;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.FindBy;
+import org.openqa.selenium.support.FindBys;
 import org.openqa.selenium.support.pagefactory.DefaultElementLocatorFactory;
 import org.openqa.selenium.support.pagefactory.DefaultFieldDecorator;
 import org.openqa.selenium.support.pagefactory.ElementLocator;
 
-import java.lang.reflect.Field;
+import java.lang.reflect.*;
+import java.util.List;
 
 public class CustomFieldDecorator extends DefaultFieldDecorator {
 
-    public CustomFieldDecorator(SearchContext searchContext) {
+    CustomFieldDecorator(SearchContext searchContext) {
         super(new DefaultElementLocatorFactory(searchContext));
     }
 
-    @Override
     public Object decorate(ClassLoader loader, Field field) {
-        Class<?> decoratableClass = decoratableClass(field);
+        Class<IElement> decoratableClass = decoratableClass(field);
         if (decoratableClass != null) {
             ElementLocator locator = factory.createLocator(field);
             if (locator == null)
                 return null;
+            if (List.class.isAssignableFrom(field.getType()))
+                return createList(loader, locator, decoratableClass);
             return createElement(loader, locator, decoratableClass);
         }
         return super.decorate(loader, field);
     }
 
-    private Class<?> decoratableClass(Field field) {
+    @SuppressWarnings("unchecked")
+    private Class<IElement> decoratableClass(Field field) {
         Class<?> clazz = field.getType();
-        try {
-            clazz.getConstructor(WebElement.class);
-        } catch (Exception e) {
+        if (List.class.isAssignableFrom(clazz)) {
+            if (field.getAnnotation(FindBy.class) == null &&
+                    field.getAnnotation(FindBys.class) == null) {
+                return null;
+            }
+            Type genericType = field.getGenericType();
+            if (!(genericType instanceof ParameterizedType)) {
+                return null;
+            }
+            clazz = (Class<?>) ((ParameterizedType) genericType).
+                    getActualTypeArguments()[0];
+        }
+        if (IElement.class.isAssignableFrom(clazz))
+            return (Class<IElement>) clazz;
+        else
             return null;
-        }
-        return clazz;
     }
 
-    protected <T> T createElement(ClassLoader loader,
-                                  ElementLocator locator, Class<T> clazz) {
+    private IElement createElement(ClassLoader loader,
+                                     ElementLocator locator,
+                                     Class<IElement> clazz) {
         WebElement proxy = proxyForLocator(loader, locator);
-        return createInstance(clazz, proxy);
+        return WrapperFactory.createInstance(clazz, proxy);
     }
 
-    private <T> T createInstance(Class<T> clazz, WebElement element) {
-        try {
-            return clazz.getConstructor(WebElement.class)
-                    .newInstance(element);
-        } catch (Exception e) {
-            throw new AssertionError(
-                    "WebElement can't be represented as " + clazz
-            );
-        }
+    @SuppressWarnings("unchecked")
+    private List<IElement> createList(ClassLoader loader,
+                                        ElementLocator locator,
+                                        Class<IElement> clazz) {
+        InvocationHandler handler =
+                new LocatingCustomElementListHandler(locator, clazz);
+        return (List<IElement>) Proxy.newProxyInstance(
+                loader, new Class[]{List.class}, handler);
     }
 }
+
